@@ -10,7 +10,6 @@ import type { NavItem } from './types';
 import { Sidebar }         from './components/Sidebar';
 import { OverviewPage }    from './components/Overview/OverviewPage';
 import { WardMapPage }     from './components/WardMap/WardMapPage';
-import { PlaceholderPage } from './components/shared/PlaceholderPage';
 
 // Page titles shown in the topbar
 const PAGE_TITLES: Record<NavItem, string> = {

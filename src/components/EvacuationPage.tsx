@@ -85,11 +85,7 @@ export function EvacuationPage() {
     (centre) => centre.status === 'Open',
   ).length;
 
-  const totalCapacity = centres.reduce(
-    (total, centre) => total + centre.capacity,
-    0,
-  );
-
+  
   const totalOccupancy = centres.reduce(
     (total, centre) => total + centre.occupancy,
     0,
