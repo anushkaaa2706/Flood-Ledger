@@ -4,6 +4,7 @@
 
 export type RiskLevel = 'HIGH' | 'MEDIUM_HIGH' | 'MEDIUM' | 'LOW';
 
+
 export type NavItem =
   | 'overview'
   | 'ward-map'
@@ -11,6 +12,7 @@ export type NavItem =
   | 'citizen-reports'
   | 'evacuation'
   | 'relief-ledger'
+  | 'sos-mesh'
   | 'accountability';
 
 // ── Ward ──────────────────────────────────────────────────────────────────────
