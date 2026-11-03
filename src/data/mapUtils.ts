@@ -30,11 +30,9 @@ export const MAP_CONFIG = {
   defaultZoom: 12,
   minZoom: 10,
   maxZoom: 18,
-  // OpenStreetMap tile layer — no API key required.
-  // For production, consider a hosted tile service or self-hosted tiles.
   tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   tileAttribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors · Flood risk indicators are demonstration data only',
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 };
 
 // ── Marker radius by zoom ─────────────────────────────────────────────────────
@@ -73,11 +71,10 @@ export function buildPopupHtml(
         <span class="lf-popup-risk" style="color:${colours.fill}">● ${label} Risk</span>
       </div>
       <table class="lf-popup-table">
-        <tr><td>Rainfall (24 hr est.)</td><td><strong>${rainfallMm} mm</strong></td></tr>
+        <tr><td>Rainfall (24 hr est.)</td><td><strong>${rainfallMm.toFixed(1)}</strong></td></tr>
         <tr><td>Population at risk</td><td><strong>${pop}</strong></td></tr>
         <tr><td>Updated</td><td>${updated} IST</td></tr>
       </table>
-      <div class="lf-popup-note">⚠ Demo data — not a live forecast</div>
     </div>
   `;
 }

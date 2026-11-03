@@ -7,6 +7,7 @@ interface Props {
   active: NavItem;
   onNavigate: (item: NavItem) => void;
   userRole: UserRole | null;
+  isDemoMode: boolean;
 }
 
 interface NavEntry {
@@ -25,7 +26,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { id: 'evacuation', label: 'Evacuation Centres', icon: '⌂', section: 'OPERATIONS' },
   { id: 'relief-ledger', label: 'Relief Ledger', icon: '≡', section: 'OPERATIONS', authorityOnly: true },
   { id: 'sos-mesh', label: 'SOS Mesh', icon: '⌁', section: 'OPERATIONS' },
-  { id: 'accountability', label: 'Accountability', icon: '◐', section: 'REVIEW', authorityOnly: true },
+  { id: 'authority-management', label: 'Authority Management', icon: '♙', section: 'REVIEW', authorityOnly: true },
 ];
 
 const SECTIONS = ['MONITOR', 'OPERATIONS', 'REVIEW'] as const;
@@ -42,11 +43,11 @@ function getNow(): string {
   });
 }
 
-export function Sidebar({ active, onNavigate, userRole }: Props) {
+export function Sidebar({ active, onNavigate, userRole, isDemoMode }: Props) {
   const visibleEntries = NAV_ENTRIES.filter(
-    (entry) => !entry.authorityOnly || userRole === 'authority'
+    (entry) =>
+      !entry.authorityOnly || userRole === 'authority' || isDemoMode
   );
-
   return (
     <aside className="sidebar" role="navigation" aria-label="Primary navigation">
       <div className="sidebar-brand">

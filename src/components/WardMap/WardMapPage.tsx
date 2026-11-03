@@ -4,15 +4,14 @@
 //  - Leaflet map filling the main area
 //  - Side panel showing selected ward details and recommended actions
 //  - Map legend
-// All data comes from the shared SAMPLE_WARDS array.
+// All data comes from the shared weatherWards array.
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import L from 'leaflet';
 import type { Ward, RiskLevel } from '../../types';
-import { SAMPLE_WARDS } from '../../data/sampleData';
+import { useWardWeather } from '../../hooks/useWardWeather';
 import { LeafletMap } from '../shared/LeafletMap';
 import { RiskChip } from '../shared/RiskChip';
-import { SampleDataBadge } from '../shared/SampleDataBadge';
 import {
   RISK_COLOURS,
   RISK_LABELS,
@@ -38,6 +37,11 @@ function formatPopulation(n: number): string {
 }
 
 export function WardMapPage() {
+  const {
+  wards: weatherWards,
+  loading: weatherLoading,
+  error: weatherError,
+} = useWardWeather();
   // ── State ─────────────────────────────────────────────────────────────────
   const [activeFilters, setActiveFilters] = useState<Set<RiskLevel>>(
     () => new Set(ALL_RISK_LEVELS),
@@ -49,7 +53,7 @@ export function WardMapPage() {
   const mapInstanceRef = useRef<L.Map | null>(null);
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const filteredWards = SAMPLE_WARDS.filter((w) =>
+  const filteredWards = weatherWards.filter((w) =>
     activeFilters.has(w.riskLevel),
   );
 
@@ -58,7 +62,7 @@ export function WardMapPage() {
   // Sync marker visibility with filters
   function syncMarkerVisibility(filters: Set<RiskLevel>) {
     markersRef.current.forEach((circle, wardId) => {
-      const ward = SAMPLE_WARDS.find((w) => w.id === wardId);
+      const ward = weatherWards.find((w) => w.id === wardId);
       if (!ward) return;
       if (filters.has(ward.riskLevel)) {
         if (!mapInstanceRef.current?.hasLayer(circle)) {
@@ -87,7 +91,7 @@ export function WardMapPage() {
 
   // ── Ward selection ────────────────────────────────────────────────────────
   function selectWard(wardId: string) {
-    const ward = SAMPLE_WARDS.find((w) => w.id === wardId) ?? null;
+    const ward = weatherWards.find((w) => w.id === wardId) ?? null;
     setSelectedWard(ward);
 
     // Pan to the selected ward
@@ -115,51 +119,76 @@ export function WardMapPage() {
 
   // ── Map ready callback ────────────────────────────────────────────────────
   const handleMapReady = useCallback((map: L.Map) => {
-    mapInstanceRef.current = map;
-    markersRef.current.clear();
+  mapInstanceRef.current = map;
+}, []);
+useEffect(() => {
+  const map = mapInstanceRef.current;
+  if (!map) return;
 
-    SAMPLE_WARDS.forEach((ward) => {
-      const colours = RISK_COLOURS[ward.riskLevel];
+  // Remove markers from the previous weather-data version.
+  markersRef.current.forEach((circle) => {
+    circle.remove();
+  });
+  markersRef.current.clear();
 
-      const circle = L.circle([ward.lat, ward.lng], {
-        radius: 900,
-        color: colours.border,
-        fillColor: colours.fill,
-        fillOpacity: 0.35,
-        weight: 1.5,
-      });
+  // Rebuild markers using the latest shared weather data.
+  weatherWards.forEach((ward) => {
+    const colours = RISK_COLOURS[ward.riskLevel];
 
-      circle.bindPopup(
-        buildPopupHtml(
-          ward.id,
-          ward.name,
-          ward.riskLevel,
-          ward.rainfallMm,
-          ward.populationAtRisk,
-          ward.lastUpdated,
-        ),
-        { maxWidth: 280, className: 'fl-popup' },
-      );
-
-      circle.bindTooltip(`${ward.id} · ${ward.name}`, {
-        permanent: false,
-        direction: 'top',
-        className: 'fl-tooltip',
-      });
-
-      circle.on('click', () => {
-        selectWard(ward.id);
-      });
-
-      circle.addTo(map);
-      markersRef.current.set(ward.id, circle);
+    const circle = L.circle([ward.lat, ward.lng], {
+      radius: 900,
+      color: colours.border,
+      fillColor: colours.fill,
+      fillOpacity: 0.35,
+      weight: 1.5,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    circle.bindPopup(
+      buildPopupHtml(
+        ward.id,
+        ward.name,
+        ward.riskLevel,
+        ward.rainfallMm,
+        ward.populationAtRisk,
+        ward.lastUpdated,
+      ),
+      { maxWidth: 280, className: 'fl-popup' },
+    );
+
+    circle.bindTooltip(`${ward.id} · ${ward.name}`, {
+      permanent: false,
+      direction: 'top',
+      className: 'fl-tooltip',
+    });
+
+    circle.on('click', () => {
+      setSelectedWard(ward);
+    });
+
+    if (activeFilters.has(ward.riskLevel)) {
+      circle.addTo(map);
+    }
+
+    markersRef.current.set(ward.id, circle);
+  });
+
+  // Keep the selected ward panel in sync with refreshed weather data.
+  setSelectedWard((current) => {
+    if (!current) return null;
+    return weatherWards.find((ward) => ward.id === current.id) ?? null;
+  });
+}, [weatherWards, activeFilters]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="wmp-layout">
+            {weatherLoading && (
+        <p role="status">Loading estimated weather data…</p>
+      )}
+
+      {weatherError && (
+        <p role="alert">{weatherError}</p>
+      )}
       {/* ── Left: map area ─────────────────────────────────────────────────── */}
       <div className="wmp-main">
         {/* Filter bar */}
@@ -187,9 +216,8 @@ export function WardMapPage() {
             })}
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <SampleDataBadge />
             <span className="wmp-filterbar-meta">
-              {filteredWards.length} of {SAMPLE_WARDS.length} wards shown
+              {filteredWards.length} of {weatherWards.length} wards shown
             </span>
           </div>
         </div>
@@ -212,7 +240,6 @@ export function WardMapPage() {
             </div>
           ))}
           <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            Circles are approx. centroids — not official ward boundaries
           </span>
         </div>
       </div>
@@ -305,12 +332,41 @@ function WardDetail({ ward, onClose }: WardDetailProps) {
         <tbody>
           <tr>
             <td className="wd-table-label">Rainfall (24 hr est.)</td>
-            <td className="wd-table-value">{ward.rainfallMm} mm</td>
+            <td className="wd-table-value">{ward.rainfallMm.toFixed(1)} mm</td>
           </tr>
-          <tr>
-            <td className="wd-table-label">Population at risk</td>
-            <td className="wd-table-value">{formatPopulation(ward.populationAtRisk)}</td>
+                   <tr>
+            <td className="wd-table-label">Total population</td>
+            <td className="wd-table-value">
+              {ward.populationEstimate !== undefined
+                ? formatPopulation(ward.populationEstimate)
+                : 'Population mapping pending'}
+            </td>
           </tr>
+
+          {ward.populationEstimate !== undefined && (
+            <tr>
+              <td className="wd-table-label">BMC administrative ward</td>
+              <td className="wd-table-value">
+                {ward.administrativeWardCode ?? 'Not specified'}
+              </td>
+            </tr>
+          )}
+
+          {ward.populationEstimate !== undefined && (
+            <tr>
+              <td className="wd-table-label">Population estimate year</td>
+              <td className="wd-table-value">
+                {ward.populationYear ?? 'Not specified'}
+              </td>
+            </tr>
+          )}
+
+{ward.populationEstimate !== undefined && (
+  <tr>
+    <td className="wd-table-label">Population estimate year</td>
+    <td className="wd-table-value">{ward.populationYear}</td>
+  </tr>
+)}
           <tr>
             <td className="wd-table-label">Last updated</td>
             <td className="wd-table-value">{formatTimestamp(ward.lastUpdated)}</td>
@@ -332,7 +388,6 @@ function WardDetail({ ward, onClose }: WardDetailProps) {
       <div className="wd-actions-section">
         <div className="wd-actions-header">
           <span className="section-title">Recommended Actions</span>
-          <SampleDataBadge />
         </div>
         <ol className="wd-actions-list">
           {ward.recommendedActions.map((action, i) => (
@@ -346,8 +401,6 @@ function WardDetail({ ward, onClose }: WardDetailProps) {
 
       {/* Footer disclaimer */}
       <div className="wd-disclaimer">
-        ⚠ All information shown is demonstration data and does not represent
-        live forecasts or official advisories.
       </div>
     </div>
   );

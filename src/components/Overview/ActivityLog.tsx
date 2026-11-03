@@ -2,7 +2,6 @@
 // Shows a chronological list of recent actions across all operational categories.
 
 import type { ActivityEntry } from '../../types';
-import { SampleDataBadge } from '../shared/SampleDataBadge';
 
 interface Props {
   entries: ActivityEntry[];
@@ -33,7 +32,6 @@ export function ActivityLog({ entries }: Props) {
       <div className="activity-panel-header">
         <span className="section-title">Recent Activity</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <SampleDataBadge />
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
             {entries.length} entries
           </span>

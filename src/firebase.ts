@@ -1,5 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps } from "firebase/app";
+import {
+  getAuth,
+  initializeAuth,
+  inMemoryPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -11,9 +15,28 @@ const firebaseConfig = {
   appId: "1:362012435624:web:57c22544520d2810fc8e9d",
 };
 
-const app = initializeApp(firebaseConfig);
+const app =
+  getApps().find((item) => item.name === "[DEFAULT]") ??
+  initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Separate authentication instance for creating Authority accounts.
+const secondaryApp =
+  getApps().find(
+    (item) => item.name === "authority-account-creator"
+  ) ?? initializeApp(firebaseConfig, "authority-account-creator");
+
+export const authorityCreationAuth = (() => {
+  try {
+    return initializeAuth(secondaryApp, {
+      persistence: inMemoryPersistence,
+    });
+  } catch {
+    // Reuse the existing instance during development hot reloads.
+    return getAuth(secondaryApp);
+  }
+})();
 
 export default app;

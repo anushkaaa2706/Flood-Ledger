@@ -50,10 +50,19 @@ const INITIAL_TASKS: Task[] = [
 function loadTasks(): Task[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved) as Task[];
+
+    if (saved !== null) {
+      const parsed: unknown = JSON.parse(saved);
+
+      if (Array.isArray(parsed)) {
+        return parsed as Task[];
+      }
+    }
   } catch {
     // Fall back to sample tasks if saved data cannot be read.
   }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TASKS));
   return INITIAL_TASKS;
 }
 
@@ -72,7 +81,18 @@ function formatDate(value: string): string {
   });
 }
 
-export function PreparednessPage() {
+type UserRole = 'citizen' | 'authority';
+
+interface PreparednessPageProps {
+  userRole: UserRole | null;
+  isDemoMode: boolean;
+}
+
+export function PreparednessPage({
+  userRole,
+  isDemoMode,
+}: PreparednessPageProps) {
+  const canManageTasks = userRole === 'authority' || isDemoMode;
   const [tasks, setTasks] = useState<Task[]>(loadTasks);
   const [showForm, setShowForm] = useState(false);
   const [action, setAction] = useState('');
@@ -84,13 +104,15 @@ export function PreparednessPage() {
   const [error, setError] = useState('');
 
   function saveTasks(next: Task[]) {
-    setTasks(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      setError('Changes are visible, but browser storage was unavailable.');
-    }
+  setTasks(next);
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event('preparedness-tasks-updated'));
+  } catch {
+    setError('Changes are visible, but browser storage was unavailable.');
   }
+}
 
   function addTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -148,15 +170,14 @@ export function PreparednessPage() {
           <h1>Preparedness register</h1>
           <p>Assign, track, and complete actions before conditions deteriorate.</p>
         </div>
-        <button
-          className="prep-primary-button"
-          onClick={() => {
-            setShowForm(!showForm);
-            setError('');
-          }}
-        >
-          {showForm ? 'Cancel' : '+ Add task'}
-        </button>
+       {canManageTasks && (
+  <button
+    className="prep-primary-button"
+    onClick={() => setShowForm(!showForm)}
+  >
+    {showForm ? 'Cancel' : '+ Add task'}
+  </button>
+)}
       </div>
 
       
@@ -180,8 +201,9 @@ export function PreparednessPage() {
         </div>
       </div>
 
-      {showForm && (
-        <form className="prep-form" onSubmit={addTask}>
+      {canManageTasks && showForm && (
+  <form
+        className="prep-form" onSubmit={addTask}>
           <div className="prep-form-heading">Register a preparedness action</div>
 
           <label className="prep-field prep-field-wide">
@@ -307,18 +329,25 @@ export function PreparednessPage() {
                       {task.priority}
                     </span>
                   </td>
-                  <td>
-                    <select
-                      className={`prep-status prep-status-${task.status.toLowerCase().replace(' ', '-')}`}
-                      value={task.status}
-                      aria-label={`Status for ${task.action}`}
-                      onChange={(event) => updateStatus(task, event.target.value as TaskStatus)}
-                    >
-                      <option>Pending</option>
-                      <option>In progress</option>
-                      <option>Completed</option>
-                    </select>
-                  </td>
+     
+<td>
+  {canManageTasks ? (
+    <select
+      className="prep-status-select"
+      value={task.status}
+      onChange={(event) =>
+        updateStatus(task, event.target.value as TaskStatus)
+      }
+    >
+      <option value="Pending">Pending</option>
+      <option value="In progress">In progress</option>
+      <option value="Completed">Completed</option>
+    </select>
+  ) : (
+    <span>{task.status}</span>
+  )}
+</td>
+
                 </tr>
               ))}
               {visibleTasks.length === 0 && (

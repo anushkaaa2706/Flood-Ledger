@@ -11,6 +11,7 @@ interface SupplyRecord {
   id: string;
   item: SupplyType;
   ward: string;
+  required: number;
   received: number;
   distributed: number;
   updatedAt: string;
@@ -33,6 +34,7 @@ const INITIAL_SUPPLIES: SupplyRecord[] = [
     id: 'RL-001',
     item: 'Food packets',
     ward: 'Bhandup West',
+    required: 1000,
     received: 1000,
     distributed: 600,
     updatedAt: '2026-10-25',
@@ -41,6 +43,7 @@ const INITIAL_SUPPLIES: SupplyRecord[] = [
     id: 'RL-002',
     item: 'Drinking water',
     ward: 'Chembur',
+    required: 800,
     received: 800,
     distributed: 500,
     updatedAt: '2026-10-25',
@@ -49,6 +52,7 @@ const INITIAL_SUPPLIES: SupplyRecord[] = [
     id: 'RL-003',
     item: 'Blankets',
     ward: 'Mulund East',
+    required: 400,
     received: 400,
     distributed: 200,
     updatedAt: '2026-10-25',
@@ -57,6 +61,7 @@ const INITIAL_SUPPLIES: SupplyRecord[] = [
     id: 'RL-004',
     item: 'Medical kits',
     ward: 'Chembur',
+    required: 300,
     received: 300,
     distributed: 150,
     updatedAt: '2026-10-25',
@@ -85,9 +90,15 @@ function formatNumber(value: number): string {
 }
 
 export function ReliefLedgerPage() {
-  const [supplies, setSupplies] = useState<SupplyRecord[]>(
-    () => loadRecords(STORAGE_KEY, INITIAL_SUPPLIES),
-  );
+  const [supplies, setSupplies] = useState<SupplyRecord[]>(() =>
+  loadRecords(STORAGE_KEY, INITIAL_SUPPLIES).map((record) => ({
+    ...record,
+    required:
+      Number.isFinite(record.required) && record.required > 0
+        ? record.required
+        : record.received,
+  })),
+);
   const [distributions, setDistributions] = useState<DistributionRecord[]>(
     () => loadRecords<DistributionRecord>(DISTRIBUTION_KEY, []),
   );
@@ -99,6 +110,7 @@ export function ReliefLedgerPage() {
   const [supplyItem, setSupplyItem] = useState<SupplyType>('Food packets');
   const [supplyWard, setSupplyWard] = useState('Bhandup West');
   const [supplyQuantity, setSupplyQuantity] = useState('');
+  const [supplyRequired, setSupplyRequired] = useState('');
   const [distributionItem, setDistributionItem] =
     useState<SupplyType>('Food packets');
   const [distributionWard, setDistributionWard] =
@@ -122,6 +134,7 @@ export function ReliefLedgerPage() {
     }
   }, [distributions]);
 
+
   const totalReceived = supplies.reduce(
     (sum, record) => sum + record.received,
     0,
@@ -134,6 +147,41 @@ export function ReliefLedgerPage() {
     (sum, record) => sum + Math.max(0, record.received - record.distributed),
     0,
   );
+  const recordsWithRequirements = supplies.filter(
+  (record) => record.required > 0,
+);
+
+const reliefGapPct =
+  supplies.length > 0 &&
+  recordsWithRequirements.length === supplies.length
+    ? Math.round(
+        (recordsWithRequirements.reduce(
+          (sum, record) =>
+            sum +
+            (Math.max(0, record.required - record.distributed) /
+              record.required) *
+              100,
+          0,
+        ) /
+          recordsWithRequirements.length) *
+          10,
+      ) / 10
+    : null;
+    useEffect(() => {
+  try {
+    if (reliefGapPct === null) {
+      localStorage.removeItem('flood-ledger-relief-gap');
+    } else {
+      localStorage.setItem(
+        'flood-ledger-relief-gap',
+        String(reliefGapPct),
+      );
+      window.dispatchEvent(new Event('flood-ledger-relief-gap-updated'));
+    }
+  } catch {
+    // Keep the page usable if browser storage is unavailable.
+  }
+}, [reliefGapPct]);
 
   const wards = useMemo(
     () => ['All wards', ...new Set(supplies.map((record) => record.ward))],
@@ -145,45 +193,55 @@ export function ReliefLedgerPage() {
   );
 
   function addSupply() {
-    const quantity = Number(supplyQuantity);
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      window.alert('Enter a valid quantity greater than zero.');
-      return;
-    }
+  const quantity = Number(supplyQuantity);
+  const required = Number(supplyRequired);
 
-    const existing = supplies.find(
-      (record) => record.item === supplyItem && record.ward === supplyWard,
-    );
-
-    if (existing) {
-      setSupplies((current) =>
-        current.map((record) =>
-          record.id === existing.id
-            ? {
-                ...record,
-                received: record.received + quantity,
-                updatedAt: today(),
-              }
-            : record,
-        ),
-      );
-    } else {
-      setSupplies((current) => [
-        ...current,
-        {
-          id: `RL-${String(Date.now()).slice(-6)}`,
-          item: supplyItem,
-          ward: supplyWard,
-          received: quantity,
-          distributed: 0,
-          updatedAt: today(),
-        },
-      ]);
-    }
-
-    setSupplyQuantity('');
-    setShowSupplyForm(false);
+  if (!Number.isInteger(required) || required <= 0) {
+    window.alert('Enter a valid required quantity greater than zero.');
+    return;
   }
+
+  if (!Number.isInteger(quantity) || quantity < 0) {
+    window.alert('Enter a valid received quantity (zero or greater).');
+    return;
+  }
+
+  const existing = supplies.find(
+    (record) => record.item === supplyItem && record.ward === supplyWard,
+  );
+
+  if (existing) {
+    setSupplies((current) =>
+      current.map((record) =>
+        record.id === existing.id
+          ? {
+              ...record,
+              required,
+              received: record.received + quantity,
+              updatedAt: today(),
+            }
+          : record,
+      ),
+    );
+  } else {
+    setSupplies((current) => [
+      ...current,
+      {
+  id: `RL-${String(Date.now()).slice(-6)}`,
+  item: supplyItem,
+  ward: supplyWard,
+  required: required,
+received: quantity,
+  distributed: 0,
+  updatedAt: today(),
+}
+    ]);
+  }
+
+  setSupplyQuantity('');
+  setSupplyRequired('');
+  setShowSupplyForm(false);
+}
 
   function addDistribution() {
     const quantity = Number(distributionQuantity);
@@ -322,17 +380,29 @@ export function ReliefLedgerPage() {
                 <option>Mulund East</option>
               </select>
             </label>
-            <label>
-              Quantity received
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={supplyQuantity}
-                onChange={(event) => setSupplyQuantity(event.target.value)}
-                placeholder="Enter quantity"
-              />
-            </label>
+           <label>
+  Total quantity required
+  <input
+    type="number"
+    min="1"
+    step="1"
+    value={supplyRequired}
+    onChange={(event) => setSupplyRequired(event.target.value)}
+    placeholder="Enter total requirement"
+  />
+</label>
+
+<label>
+  Quantity received
+  <input
+    type="number"
+    min="0"
+    step="1"
+    value={supplyQuantity}
+    onChange={(event) => setSupplyQuantity(event.target.value)}
+    placeholder="Enter quantity received"
+  />
+</label>
           </div>
           <div className="rl-form-actions">
             <button className="rl-button rl-secondary" onClick={() => setShowSupplyForm(false)}>

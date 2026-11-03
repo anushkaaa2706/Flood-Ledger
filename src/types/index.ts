@@ -13,7 +13,8 @@ export type NavItem =
   | 'evacuation'
   | 'relief-ledger'
   | 'sos-mesh'
-  | 'accountability';
+  | 'authority-management';
+
 
 // ── Ward ──────────────────────────────────────────────────────────────────────
 // Single source of truth for ward data used by the map, risk list, and metrics.
@@ -22,10 +23,17 @@ export interface Ward {
   name: string;
   riskLevel: RiskLevel;
   rainfallMm: number;         // estimated 24-hr rainfall in mm
+  forecastRainfallMm?: number;
+  currentPrecipitationMm?: number;
+weatherUpdatedAt?: string;
+weatherSource?: string;
   populationAtRisk: number;
+  populationEstimate: undefined,
+populationYear: undefined,
+populationSource: undefined,
   lastUpdated: string;        // ISO 8601 timestamp
   dataSource: string;
-
+  administrativeWardCode?: string;
   // Geographic location — approximate centroid for map markers.
   // Replace with real ward boundary GeoJSON when available.
   // Integration point: src/data/api/wardBoundaries.ts
@@ -42,9 +50,9 @@ export interface Ward {
 // the card numbers always match the ward list. Never hard-code separately.
 export interface SummaryMetrics {
   highRiskWards: number;
-  pendingReports: number;
-  evacuationCapacityPct: number;  // 0–100
-  reliefGapPct: number;           // 0–100, higher = bigger gap
+  pendingReports: number | null;
+  evacuationCapacityPct: number | null;
+  reliefGapPct: number | null;
 }
 
 export interface ChecklistItem {

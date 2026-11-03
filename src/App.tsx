@@ -5,7 +5,6 @@ import type { NavItem } from './types';
 import { LoginPage } from './components/LoginPage';
 import { LandingPage } from './components/LandingPage';
 import { SOSMeshPage } from './components/SOSMeshPage';
-import { AccountabilityPage } from './components/AccountabilityPage';
 import { ReliefLedgerPage } from './components/ReliefLedgerPage';
 import { EvacuationPage } from './components/EvacuationPage';
 import { CitizenReportsPage } from './components/CitizenReportsPage';
@@ -13,6 +12,7 @@ import { PreparednessPage } from './components/PreparednessPage';
 import { Sidebar } from './components/Sidebar';
 import { OverviewPage } from './components/Overview/OverviewPage';
 import { WardMapPage } from './components/WardMap/WardMapPage';
+import { AuthorityManagementPage } from './components/AuthorityManagementPage';
 
 type UserRole = 'citizen' | 'authority';
 
@@ -23,14 +23,14 @@ const PAGE_TITLES: Record<NavItem, string> = {
   'citizen-reports': 'Citizen Reports',
   evacuation: 'Evacuation Centres',
   'relief-ledger': 'Relief Ledger',
-  accountability: 'Accountability',
   'sos-mesh': 'SOS Mesh',
+  'authority-management': 'Authority Management',
 };
 
 const AUTHORITY_ONLY_PAGES: NavItem[] = [
   'overview',
   'relief-ledger',
-  'accountability',
+   'authority-management',
 ];
 
 const PHASE = 'PRE-FLOOD MONITORING';
@@ -52,13 +52,15 @@ function formatNow(): string {
 
 export default function App() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [showLanding, setShowLanding] = useState(true);
-  const [showLogin, setShowLogin] = useState(false);
-  const [activePage, setActivePage] = useState<NavItem>('overview');
+const [isDemoMode, setIsDemoMode] = useState(false);
+const [showLanding, setShowLanding] = useState(true);
+const [showLogin, setShowLogin] = useState(false);
+const [activePage, setActivePage] = useState<NavItem>('overview');
 
   function allowedPage(page: NavItem, role: UserRole | null): boolean {
-    return role === 'authority' || !AUTHORITY_ONLY_PAGES.includes(page);
-  }
+  if (isDemoMode) return true;
+  return role === 'authority' || !AUTHORITY_ONLY_PAGES.includes(page);
+}
 
   function handleNavigate(page: NavItem) {
     if (allowedPage(page, userRole)) {
@@ -69,21 +71,39 @@ export default function App() {
   function renderPage() {
     switch (activePage) {
       case 'overview':
-        return <OverviewPage />;
+        return <OverviewPage
+  userRole={userRole}
+  isDemoMode={isDemoMode}
+/>
       case 'ward-map':
         return <WardMapPage />;
       case 'preparedness':
-        return <PreparednessPage />;
+  return (
+  <PreparednessPage
+    userRole={userRole}
+    isDemoMode={isDemoMode}
+  />
+);
       case 'citizen-reports':
-        return <CitizenReportsPage />;
+  return (
+  <CitizenReportsPage
+    userRole={userRole}
+    isDemoMode={isDemoMode}
+  />
+);
       case 'evacuation':
-        return <EvacuationPage />;
+  return (
+  <EvacuationPage
+    userRole={userRole}
+    isDemoMode={isDemoMode}
+  />
+);
       case 'relief-ledger':
         return <ReliefLedgerPage />;
-      case 'accountability':
-        return <AccountabilityPage />;
       case 'sos-mesh':
         return <SOSMeshPage />;
+        case 'authority-management':
+  return <AuthorityManagementPage />;
       default:
         return null;
     }
@@ -94,11 +114,12 @@ export default function App() {
       <LandingPage
         onLogin={() => setShowLogin(true)}
         onExploreDemo={() => {
-          setShowLanding(false);
-          setShowLogin(false);
-          setUserRole(null);
-          setActivePage('ward-map');
-        }}
+  setIsDemoMode(true);
+  setShowLanding(false);
+  setShowLogin(false);
+  setUserRole(null);
+  setActivePage('overview');
+}}
       />
     );
   }
@@ -108,11 +129,12 @@ export default function App() {
       <LoginPage
         onBack={() => setShowLogin(false)}
         onLoginSuccess={(role) => {
-          setUserRole(role);
-          setActivePage(role === 'authority' ? 'overview' : 'ward-map');
-          setShowLogin(false);
-          setShowLanding(false);
-        }}
+  setIsDemoMode(false);
+  setUserRole(role);
+  setActivePage(role === 'authority' ? 'overview' : 'ward-map');
+  setShowLogin(false);
+  setShowLanding(false);
+}}
       />
     );
   }
@@ -126,10 +148,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar
-        active={activePage}
-        onNavigate={handleNavigate}
-        userRole={userRole}
-      />
+  active={activePage}
+  onNavigate={handleNavigate}
+  userRole={userRole}
+  isDemoMode={isDemoMode}
+/>
 
       <div className="main-content">
         <header className="topbar">
@@ -137,10 +160,11 @@ export default function App() {
             className="back-to-landing"
             type="button"
             onClick={() => {
-              setShowLanding(true);
-              setShowLogin(false);
-              setUserRole(null);
-            }}
+  setShowLanding(true);
+  setShowLogin(false);
+  setUserRole(null);
+  setIsDemoMode(false);
+}}
           >
             ← Flood Ledger
           </button>

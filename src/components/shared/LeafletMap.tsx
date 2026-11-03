@@ -1,34 +1,26 @@
-// ─── Shared: LeafletMap ───────────────────────────────────────────────────────
-// Reusable Leaflet map container component.
-// Renders a Leaflet map inside the given container div, then hands the map
-// instance to the parent via onMapReady so the parent can add layers.
-// This component owns nothing except the DOM mount/unmount lifecycle.
 
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { MAP_CONFIG } from '../../data/mapUtils';
 
 interface Props {
-  /** Called once when the Leaflet map is initialised. Parent adds markers/layers here. */
   onMapReady: (map: L.Map) => void;
-  /** Optional CSS class to apply to the container div. */
   className?: string;
-  /** Initial centre; defaults to MAP_CONFIG.defaultCenter */
   center?: [number, number];
-  /** Initial zoom; defaults to MAP_CONFIG.defaultZoom */
   zoom?: number;
 }
 
 export function LeafletMap({ onMapReady, className, center, zoom }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef       = useRef<L.Map | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    const container = containerRef.current;
+    if (!container || mapRef.current) return;
 
-    const map = L.map(containerRef.current, {
+    const map = L.map(container, {
       center: center ?? MAP_CONFIG.defaultCenter,
-      zoom:   zoom   ?? MAP_CONFIG.defaultZoom,
+      zoom: zoom ?? MAP_CONFIG.defaultZoom,
       minZoom: MAP_CONFIG.minZoom,
       maxZoom: MAP_CONFIG.maxZoom,
       zoomControl: true,
@@ -41,13 +33,27 @@ export function LeafletMap({ onMapReady, className, center, zoom }: Props) {
     }).addTo(map);
 
     mapRef.current = map;
+
+    // Recalculate the map whenever its container changes size.
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize({ pan: false });
+    });
+
+    resizeObserver.observe(container);
+
+    // Recalculate once after the initial layout.
+    requestAnimationFrame(() => {
+      map.invalidateSize({ pan: false });
+    });
+
     onMapReady(map);
 
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
-    // onMapReady is intentionally excluded from deps — it must only fire once.
+    // Map is initialized once; parent handles changing ward data.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -55,7 +61,6 @@ export function LeafletMap({ onMapReady, className, center, zoom }: Props) {
     <div
       ref={containerRef}
       className={className ?? ''}
-      // aria-label set by the parent panel
     />
   );
 }

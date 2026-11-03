@@ -105,7 +105,18 @@ function formatDate(value: string): string {
   });
 }
 
-export function CitizenReportsPage() {
+type UserRole = 'citizen' | 'authority';
+
+interface CitizenReportsPageProps {
+  userRole: UserRole | null;
+  isDemoMode: boolean;
+}
+
+export function CitizenReportsPage({
+  userRole,
+  isDemoMode,
+}: CitizenReportsPageProps) {
+  const canReviewReports = userRole === 'authority' || isDemoMode;
   const [reports, setReports] = useState<CitizenReport[]>(loadReports);
   const [filter, setFilter] = useState<StatusFilter>('All reports');
 
@@ -256,9 +267,10 @@ setGpsMessage('');
           <p className="cr-eyebrow">FIELD INTELLIGENCE / REPORT REGISTER</p>
           <h1>Citizen Reports</h1>
           <p className="cr-subtitle">
-            Collect local observations, verify incoming reports, and
-            identify urgent requests for action.
-          </p>
+  Submit and review community reports. Every report displays its
+  verification status so unverified information is not mistaken
+  for a confirmed incident.
+</p>
         </div>
 
         <button
@@ -563,30 +575,42 @@ setGpsMessage('');
                       )}
                     </td>
 
-                    <td>
-                      {report.status === 'Pending verification' ? (
-                        <div className="cr-review-actions">
-                          <button
-                            type="button"
-                            className="cr-review-button cr-verify-button"
-                            onClick={() => reviewReport(report.id, 'Verified')}
-                          >
-                            Verify
-                          </button>
-                          <button
-                            type="button"
-                            className="cr-review-button cr-reject-button"
-                            onClick={() => reviewReport(report.id, 'Rejected')}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="cr-table-muted">
-                          Review complete
-                        </span>
-                      )}
-                    </td>
+                    
+<td>
+ {canReviewReports ? (
+    report.status === 'Pending verification' ? (
+      <div className="cr-review-actions">
+        <button
+          type="button"
+          className="cr-review-button cr-verify-button"
+          onClick={() => reviewReport(report.id, 'Verified')}
+        >
+          Verify
+        </button>
+        <button
+          type="button"
+          className="cr-review-button cr-reject-button"
+          onClick={() => reviewReport(report.id, 'Rejected')}
+        >
+          Reject
+        </button>
+      </div>
+    ) : (
+      <span className="cr-table-muted">
+        Review complete
+      </span>
+    )
+  ) : (
+    <span className="cr-table-muted">
+      {report.status === 'Pending verification'
+        ? 'Awaiting authority review'
+        : report.status === 'Verified'
+          ? 'Verified by authority'
+          : 'Rejected by authority'}
+    </span>
+  )}
+</td>
+
                   </tr>
                 ))}
 

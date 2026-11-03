@@ -5,7 +5,6 @@
 
 import type { Ward } from '../../types';
 import { RiskChip } from '../shared/RiskChip';
-import { SampleDataBadge } from '../shared/SampleDataBadge';
 
 interface Props {
   wards: Ward[];
@@ -33,7 +32,6 @@ export function WardRiskList({ wards, selectedWardId, onSelectWard }: Props) {
     <div className="risk-panel" role="region" aria-label="Ward risk list">
       <div className="risk-panel-header">
         <span className="section-title">Ward Risk Summary</span>
-        <SampleDataBadge />
       </div>
             <div className="risk-table-scroll">
       <table className="risk-table" aria-label="Ward risk data">
@@ -41,7 +39,8 @@ export function WardRiskList({ wards, selectedWardId, onSelectWard }: Props) {
           <tr>
             <th>Ward</th>
             <th>Risk</th>
-            <th className="align-right">Rainfall (mm)</th>
+            <th className="align-right">24h Rainfall (mm)</th>
+<th className="align-right">Current Precip. (mm)</th>
             <th className="align-right">Pop. at Risk</th>
             <th className="align-right">Updated</th>
           </tr>
@@ -72,7 +71,12 @@ export function WardRiskList({ wards, selectedWardId, onSelectWard }: Props) {
               <td>
                 <RiskChip level={ward.riskLevel} />
               </td>
-              <td className="rainfall-value">{ward.rainfallMm}</td>
+              <td className="rainfall-value">{ward.rainfallMm.toFixed(1)} mm</td>
+<td className="rainfall-value">
+  {ward.currentPrecipitationMm !== undefined
+    ? ward.currentPrecipitationMm.toFixed(1)
+    : '—'}
+</td>
               <td
                 className="rainfall-value"
                 title={`${ward.populationAtRisk.toLocaleString('en-IN')} people`}

@@ -1,17 +1,50 @@
-// ─── Overview: Preparedness Checklist ────────────────────────────────────────
-// Officers can mark preparedness actions as complete. State is local to the
-// session; a real backend would persist completions with timestamps.
 
-import { useState } from 'react';
-import type { ChecklistItem } from '../../types';
-import { SampleDataBadge } from '../shared/SampleDataBadge';
+import { useEffect, useState } from 'react';
 
-interface Props {
-  items: ChecklistItem[];
+type TaskStatus = 'Pending' | 'In progress' | 'Completed';
+type TaskPriority = 'High' | 'Medium' | 'Low';
+
+interface Task {
+  id: string;
+  action: string;
+  ward: string;
+  assignedTo: string;
+  dueDate: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  completedAt?: string;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-IN', {
+interface Props {
+  canManageTasks: boolean;
+}
+
+const STORAGE_KEY = 'flood-ledger-preparedness-tasks';
+
+function loadTasks(): Task[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (saved !== null) {
+      const parsed: unknown = JSON.parse(saved);
+
+      if (Array.isArray(parsed)) {
+        return parsed as Task[];
+      }
+    }
+  } catch {
+    // Keep the Overview usable if browser storage cannot be read.
+  }
+
+  return [];
+}
+function formatDate(value: string): string {
+  if (!value) return 'No due date';
+
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return 'No due date';
+
+  return date.toLocaleDateString('en-IN', {
     timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
@@ -19,8 +52,11 @@ function formatDate(iso: string): string {
   });
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', {
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleString('en-IN', {
     timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
@@ -30,76 +66,142 @@ function formatDateTime(iso: string): string {
   });
 }
 
-export function PreparednessChecklist({ items }: Props) {
-  // Local state: track which items are toggled completed
-  const [completedIds, setCompletedIds] = useState<Set<string>>(
-    () => new Set(items.filter((i) => i.completed).map((i) => i.id))
-  );
+export function PreparednessChecklist({ canManageTasks }: Props) {
+ const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
 
-  const completedCount = completedIds.size;
-  const totalCount     = items.length;
-
-  function toggle(id: string) {
-    setCompletedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  useEffect(() => {
+  function reloadTasks() {
+    const latestTasks = loadTasks();
+    setTasks(latestTasks);
   }
 
+  reloadTasks();
+
+  window.addEventListener('preparedness-tasks-updated', reloadTasks);
+  window.addEventListener('storage', reloadTasks);
+
+  return () => {
+    window.removeEventListener(
+      'preparedness-tasks-updated',
+      reloadTasks
+    );
+    window.removeEventListener('storage', reloadTasks);
+  };
+}, []);
+
+  function updateStatus(task: Task, status: TaskStatus) {
+    if (!canManageTasks) return;
+
+    const nextTasks = tasks.map((item) =>
+      item.id === task.id
+        ? {
+            ...item,
+            status,
+            completedAt:
+              status === 'Completed'
+                ? item.status === 'Completed' && item.completedAt
+                  ? item.completedAt
+                  : new Date().toISOString()
+                : undefined,
+          }
+        : item
+    );
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextTasks));
+      setTasks(nextTasks);
+      window.dispatchEvent(new Event('preparedness-tasks-updated'));
+    } catch {
+      // Do not show an update that failed to save.
+    }
+  }
+
+  const completedCount = tasks.filter(
+    (task) => task.status === 'Completed'
+  ).length;
+
   return (
-    <div className="checklist-panel" role="region" aria-label="Preparedness checklist">
+    <div
+      className="checklist-panel"
+      role="region"
+      aria-label="Preparedness checklist"
+    >
       <div className="checklist-panel-header">
         <span className="section-title">Preparedness Checklist</span>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <SampleDataBadge />
           <span className="checklist-progress">
-            {completedCount}/{totalCount} done
+            {completedCount}/{tasks.length} done
           </span>
         </div>
       </div>
 
-      <ul className="checklist-list">
-        {items.map((item) => {
-          const isDone = completedIds.has(item.id);
-          return (
-            <li key={item.id} className="checklist-item">
-              {/* Checkbox */}
-              <button
-                className={`checklist-checkbox${isDone ? ' checked' : ''}`}
-                onClick={() => toggle(item.id)}
-                aria-label={`Mark "${item.action}" as ${isDone ? 'incomplete' : 'complete'}`}
-                aria-pressed={isDone}
-              >
-                {isDone && <span className="checklist-check-mark">✓</span>}
-              </button>
+      {tasks.length === 0 ? (
+        <p className="checklist-empty">
+          No preparedness actions are registered yet.
+        </p>
+      ) : (
+        <ul className="checklist-list">
+          {tasks.map((task) => {
+            const isDone = task.status === 'Completed';
 
-              {/* Content */}
-              <div className="checklist-item-body">
-                <div className={`checklist-item-action${isDone ? ' done' : ''}`}>
-                  {item.action}
-                </div>
-                <div className="checklist-item-meta">
-                  <span>{item.assignedTo}</span>
-                  {isDone && item.completedAt ? (
-                    <span className="checklist-meta-pill done">
-                      Done {formatDateTime(item.completedAt)}
-                    </span>
-                  ) : (
-                    <span className="checklist-meta-pill due">
-                      Due {formatDate(item.dueDate)}
-                    </span>
+            return (
+              <li key={task.id} className="checklist-item">
+                <button
+                  type="button"
+                  className={`checklist-checkbox${isDone ? ' checked' : ''}`}
+                  onClick={() =>
+                    updateStatus(
+                      task,
+                      isDone ? 'Pending' : 'Completed'
+                    )
+                  }
+                  disabled={!canManageTasks}
+                  aria-label={
+                    canManageTasks
+                      ? `Mark "${task.action}" as ${
+                          isDone ? 'incomplete' : 'complete'
+                        }`
+                      : `${task.action}: ${task.status}`
+                  }
+                  aria-pressed={isDone}
+                >
+                  {isDone && (
+                    <span className="checklist-check-mark">✓</span>
                   )}
+                </button>
+
+                <div className="checklist-item-body">
+                  <div
+                    className={`checklist-item-action${isDone ? ' done' : ''}`}
+                  >
+                    {task.action}
+                  </div>
+
+                  <div className="checklist-item-meta">
+                    <span>{task.ward} · {task.assignedTo}</span>
+
+                    {isDone && task.completedAt ? (
+                      <span className="checklist-meta-pill done">
+                        Done {formatDateTime(task.completedAt)}
+                      </span>
+                    ) : (
+                      <span className="checklist-meta-pill due">
+                        Due {formatDate(task.dueDate)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="checklist-item-meta">
+                    <span>Status: {task.status}</span>
+                    <span>Priority: {task.priority}</span>
+                  </div>
                 </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

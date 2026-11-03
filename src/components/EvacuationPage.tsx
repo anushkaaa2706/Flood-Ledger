@@ -63,7 +63,18 @@ function loadCentres(): EvacuationCentre[] {
   return INITIAL_CENTRES;
 }
 
-export function EvacuationPage() {
+type UserRole = 'citizen' | 'authority';
+
+interface EvacuationPageProps {
+  userRole: UserRole | null;
+  isDemoMode: boolean;
+}
+
+export function EvacuationPage({
+  userRole,
+  isDemoMode,
+}: EvacuationPageProps) {
+  const canManageCentres = userRole === 'authority' || isDemoMode;
   const [centres, setCentres] =
     useState<EvacuationCentre[]>(loadCentres);
 
@@ -179,9 +190,9 @@ export function EvacuationPage() {
           <p className="ev-eyebrow">FLOOD RESPONSE / FIELD OPERATIONS</p>
           <h1>Evacuation Centres</h1>
           <p className="ev-subtitle">
-            Monitor shelter capacity and manually record evacuation
-            progress across flood-affected areas.
-          </p>
+  View evacuation centres, current occupancy, available spaces,
+  and shelter status across flood-affected areas.
+</p>
         </div>
       </div>
 
@@ -293,97 +304,102 @@ export function EvacuationPage() {
                   People recorded as evacuated: {centre.evacuated}
                 </p>
 
-                {editingId === centre.id ? (
-                  <div className="ev-edit-panel">
-                    <label>
-                      Current occupancy
-                      <input
-                        type="number"
-                        min="0"
-                        max={centre.capacity}
-                        value={occupancyInput}
-                        onChange={(event) =>
-                          setOccupancyInput(event.target.value)
-                        }
-                        required
-                      />
-                    </label>
+                
+{canManageCentres && (
+  editingId === centre.id ? (
+    <div className="ev-edit-panel">
+      <label>
+        Current occupancy
+        <input
+          type="number"
+          min="0"
+          max={centre.capacity}
+          value={occupancyInput}
+          onChange={(event) =>
+            setOccupancyInput(event.target.value)
+          }
+          required
+        />
+      </label>
 
-                    <label>
-                      People evacuated
-                      <input
-                        type="number"
-                        min="0"
-                        value={evacuatedInput}
-                        onChange={(event) =>
-                          setEvacuatedInput(event.target.value)
-                        }
-                        required
-                      />
-                    </label>
+      <label>
+        People evacuated
+        <input
+          type="number"
+          min="0"
+          value={evacuatedInput}
+          onChange={(event) =>
+            setEvacuatedInput(event.target.value)
+          }
+          required
+        />
+      </label>
 
-                    <label>
-                      Centre status
-                      <select
-                        value={statusInput}
-                        onChange={(event) =>
-                          setStatusInput(
-                            event.target.value as CentreStatus,
-                          )
-                        }
-                      >
-                        <option>Open</option>
-                        <option>Full</option>
-                        <option>Closed</option>
-                      </select>
-                    </label>
+      <label>
+        Centre status
+        <select
+          value={statusInput}
+          onChange={(event) =>
+            setStatusInput(
+              event.target.value as CentreStatus,
+            )
+          }
+        >
+          <option>Open</option>
+          <option>Full</option>
+          <option>Closed</option>
+        </select>
+      </label>
 
-                    <div className="ev-actions">
-                      <button
-                        type="button"
-                        className="ev-button ev-button-secondary"
-                        onClick={() => setEditingId(null)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="ev-button ev-button-primary"
-                        onClick={() => saveChanges(centre.id)}
-                      >
-                        Save changes
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="ev-actions">
-                    <button
-                      type="button"
-                      className="ev-button ev-button-primary"
-                      onClick={() => startEditing(centre)}
-                    >
-                      Update records
-                    </button>
+      <div className="ev-actions">
+        <button
+          type="button"
+          className="ev-button ev-button-secondary"
+          onClick={() => setEditingId(null)}
+        >
+          Cancel
+        </button>
 
-                    <label className="ev-quick-status">
-                      Quick status
-                      <select
-                        aria-label={`Status for ${centre.name}`}
-                        value={centre.status}
-                        onChange={(event) =>
-                          updateStatus(
-                            centre.id,
-                            event.target.value as CentreStatus,
-                          )
-                        }
-                      >
-                        <option>Open</option>
-                        <option>Full</option>
-                        <option>Closed</option>
-                      </select>
-                    </label>
-                  </div>
-                )}
+        <button
+          type="button"
+          className="ev-button ev-button-primary"
+          onClick={() => saveChanges(centre.id)}
+        >
+          Save changes
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="ev-actions">
+      <button
+        type="button"
+        className="ev-button ev-button-primary"
+        onClick={() => startEditing(centre)}
+      >
+        Update records
+      </button>
+
+      <label className="ev-quick-status">
+        Quick status
+        <select
+          aria-label={`Status for ${centre.name}`}
+          value={centre.status}
+          onChange={(event) =>
+            updateStatus(
+              centre.id,
+              event.target.value as CentreStatus,
+            )
+          }
+        >
+          <option>Open</option>
+          <option>Full</option>
+          <option>Closed</option>
+        </select>
+      </label>
+    </div>
+  )
+)}
+
               </article>
             );
           })}
