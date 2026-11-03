@@ -6,9 +6,16 @@ import {
   type DistressReport,
 } from '../sosStorage';
 
+interface SOSCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export function SOSMeshPage() {
   const [reports, setReports] = useState<DistressReport[]>([]);
   const [location, setLocation] = useState('');
+  const [coordinates, setCoordinates] = useState<SOSCoordinates | null>(null);
+  const [capturingLocation, setCapturingLocation] = useState(false);
   const [people, setPeople] = useState('1');
   const [emergency, setEmergency] = useState('Trapped by floodwater');
   const [details, setDetails] = useState('');
@@ -46,9 +53,55 @@ export function SOSMeshPage() {
     };
   }, []);
 
+  function captureCurrentLocation() {
+    if (!navigator.geolocation) {
+      setMessage('Your browser does not support location detection.');
+      return;
+    }
+
+    setCapturingLocation(true);
+    setMessage('');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        setCoordinates({ latitude, longitude });
+
+        // Store coordinates in the existing location field.
+        // This avoids needing to change the DistressReport type.
+        setLocation(
+          `GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} | https://www.google.com/maps?q=${latitude},${longitude}`
+        );
+
+        setCapturingLocation(false);
+        setMessage('Current location captured successfully.');
+      },
+      (error) => {
+        setCapturingLocation(false);
+
+        if (error.code === error.PERMISSION_DENIED) {
+          setMessage('Location permission denied. Please allow location access in your browser.');
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setMessage('Your current location is unavailable. Please try again.');
+        } else if (error.code === error.TIMEOUT) {
+          setMessage('Location request timed out. Please try again.');
+        } else {
+          setMessage('Unable to capture your current location.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  }
+
   async function saveSOS() {
-    if (!location.trim()) {
-      setMessage('Please describe your location before saving the SOS.');
+    if (!coordinates || !location.trim()) {
+      setMessage('Please capture your current location before saving the SOS.');
       return;
     }
 
@@ -77,10 +130,11 @@ export function SOSMeshPage() {
       await refreshReports();
 
       setLocation('');
+      setCoordinates(null);
       setPeople('1');
       setDetails('');
       setMessage(
-        `SOS ${report.id.slice(0, 8)} saved on this device. It has not been sent to rescuers.`,
+        `SOS ${report.id.slice(0, 8)} saved on this device. It has not been sent to rescuers.`
       );
     } catch (error) {
       console.error('Could not save SOS:', error);
@@ -121,14 +175,37 @@ export function SOSMeshPage() {
         >
           <h2>Send a distress report</h2>
 
-          <label htmlFor="sos-location">Your location *</label>
-          <input
-            id="sos-location"
-            value={location}
-            onChange={(event) => setLocation(event.target.value)}
-            placeholder="Street, landmark, building, or area"
-            required
-          />
+          <label>Your Current Location *</label>
+
+          <button
+            type="button"
+            className="sos-submit"
+            onClick={captureCurrentLocation}
+            disabled={capturingLocation || saving}
+          >
+            {capturingLocation
+              ? 'Capturing Location...'
+              : '📍 Capture Current Location'}
+          </button>
+
+          {coordinates && (
+            <div className="sos-location-success">
+              <strong>✓ Location Captured Successfully</strong>
+              <p>
+                Latitude: {coordinates.latitude.toFixed(6)}
+              </p>
+              <p>
+                Longitude: {coordinates.longitude.toFixed(6)}
+              </p>
+              <a
+                href={`https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View location on Google Maps ↗
+              </a>
+            </div>
+          )}
 
           <label htmlFor="sos-emergency">Emergency type</label>
           <select
@@ -168,7 +245,7 @@ export function SOSMeshPage() {
           <button
             type="submit"
             className="sos-submit"
-            disabled={saving || loading}
+            disabled={saving || loading || capturingLocation}
           >
             {saving ? 'Saving SOS...' : 'Save SOS Offline'}
           </button>
